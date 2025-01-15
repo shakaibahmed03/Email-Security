@@ -1,27 +1,29 @@
 import streamlit as st
-import pickle
 import string
 import base64
 import pandas as pd
-from nltk.corpus import stopwords
 import nltk
+from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-import streamlit_authenticator as stauth
-import pyotp
+import google.generativeai as genai
+import matplotlib.pyplot as plt
+import pickle
 
 # Initialize NLTK components
 nltk.download('punkt')
 nltk.download('stopwords')
 
 # Load the model and vectorizer
-model = pickle.load(open('model1.pkl', 'rb'))
-tfidf = pickle.load(open('vectorizer1.pkl', 'rb'))
+with open('model1.pkl', 'rb') as file:
+    model = pickle.load(file)
+
+with open('vectorizer1.pkl', 'rb') as file:
+    tfidf = pickle.load(file)
+
+genai.configure(api_key="AIzaSyDT2XA6oN1XAxYbaSBrE9sD3FQj5ylmrdo")
 
 # Define text preprocessing function
 ps = PorterStemmer()
-
 
 def transform_text(text):
     text = text.lower()
@@ -47,29 +49,30 @@ def transform_text(text):
 
     return " ".join(y)
 
-
 # Set up Streamlit page configuration
 st.set_page_config(
-    page_title="Email Security through Ensemble Learning",
+    page_title="Spam Detective",
     layout="centered",
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS for enhanced UI
+# Custom CSS for enhanced UI with dull yellow buttons
 st.markdown(
     """
     <style>
     .main {
-        background-color: #f0f2f6;
+        background-color: #ffe6e6;
         padding: 20px;
         border-radius: 10px;
+        box-shadow: 0px 0px 15px rgba(255, 0, 0, 0.4);
     }
     .title {
-        color: #4CAF50;
+        color: #e60000;
         text-align: center;
+        font-weight: bold;
     }
     .stButton button {
-        background-color: #4CAF50;
+        background-color: #d4b000;
         color: white;
         padding: 10px 24px;
         text-align: center;
@@ -78,16 +81,62 @@ st.markdown(
         cursor: pointer;
         border: none;
         border-radius: 10px;
+        box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.4);
     }
     .stButton button:hover {
-        background-color: #45a049;
+        background-color: #b09e00;
     }
     .sidebar .sidebar-content {
-        background-image: linear-gradient(#2e7bcf,#2e7bcf);
+        background-color: #e60000;
         color: white;
     }
     .sidebar .sidebar-content h2 {
         color: white;
+    }
+    .output.spam {
+        text-align: center;
+        color: red;
+        font-size: 24px;
+        font-weight: bold;
+    }
+    .output.not-spam {
+        text-align: center;
+        color: green;
+        font-size: 24px;
+        font-weight: bold;
+    }
+    .title-banner {
+        background-color: #e60000;
+        padding: 20px;
+        border-radius: 10px;
+        color: white;
+        font-size: 32px;
+        text-align: center;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+    }
+    .footer {
+        background-color: #e60000;
+        padding: 10px;
+        color: white;
+        text-align: center;
+        border-radius: 10px;
+        margin-top: 20px;
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.4);
+    }
+    .login-card {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+    }
+    .login-title {
+        text-align: center;
+        color: #e60000;
+        font-weight: bold;
+        margin-bottom: 20px;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
     }
     </style>
     """,
@@ -105,7 +154,6 @@ if 'logged_in' not in st.session_state:
 if '2fa_enabled' not in st.session_state:
     st.session_state['2fa_enabled'] = False
 
-
 def login(username, password):
     # Dummy check for example purposes
     if username == "user" and password == "pass":
@@ -116,14 +164,13 @@ def login(username, password):
     else:
         return False
 
-
 # Sidebar navigation
 st.sidebar.title("Navigation")
 if st.session_state.logged_in:
     if st.session_state['2fa_enabled'] and not st.session_state.get('2fa_verified', False):
         page = "2FA"
     else:
-        page = st.sidebar.radio("Go to", ["Information", "Input", "Output", "History", "Batch Processing", "Admin"])
+        page = st.sidebar.radio("Go to", ["Information", "Input", "Output", "History", "Graph"])
 else:
     page = "Login"
 
@@ -141,7 +188,17 @@ if page == "2FA":
 
 # Login page
 if page == "Login":
-    st.title("Login")
+    st.markdown('<div class="title-banner">Spam Detective</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="login-card">
+            <div class="login-title">Login to Continue</div>
+            <p>Enter your credentials to access the Spam Detective application.</p>
+            <p>Make sure you have your two-factor authentication device handy.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     if st.button("Login"):
@@ -152,7 +209,7 @@ if page == "Login":
 
 # Information page
 if page == "Information":
-    st.title("Email Security through Ensemble Learning")
+    st.markdown('<div class="title-banner">Spam Detective</div>', unsafe_allow_html=True)
     st.write("""
     ## Email/SMS Spam Classifier
 
@@ -172,96 +229,90 @@ if page == "Information":
 
 # Input page
 elif page == "Input":
-    st.title("Input")
+    st.markdown('<div class="title-banner">Spam Detective - Input</div>', unsafe_allow_html=True)
     input_sms = st.text_area("Enter the message")
 
     if st.button('Predict'):
         transformed_sms = transform_text(input_sms)
         vector_input = tfidf.transform([transformed_sms])
         result = model.predict(vector_input)[0]
-
+        
         if result == 1:
             st.session_state['prediction'] = "Spam"
         else:
             st.session_state['prediction'] = "Not Spam"
 
-        st.session_state.history.append((input_sms, st.session_state['prediction']))
+        st.session_state.history.append((input_sms, st.session_state['prediction'], ""))
         st.write("Prediction complete. Please navigate to the Output page to see the result.")
 
 # Output page
 elif page == "Output":
-    st.title("Output")
+    st.markdown('<div class="title-banner">Spam Detective - Output</div>', unsafe_allow_html=True)
     if 'prediction' in st.session_state:
-        if st.session_state['prediction'] == "Spam":
-            st.markdown(
-                """
-                <style>
-                .output {
-                    text-align: center;
-                    color: red;
-                    font-size: 24px;
-                }
-                </style>
-                """,
-                unsafe_allow_html=True
-            )
-            st.markdown('<div class="output">Spam</div>', unsafe_allow_html=True)
+        prediction_text = st.session_state['prediction']
+        if prediction_text == "Spam":
+            st.markdown('<div class="output spam">Spam</div>', unsafe_allow_html=True)
             st.image("https://media.giphy.com/media/3o7btPCcdNniyf0ArS/giphy.gif", width=300)
         else:
-            st.markdown(
-                """
-                <style>
-                .output {
-                    text-align: center;
-                    color: green;
-                    font-size: 24px;
-                }
-                </style>
-                """,
-                unsafe_allow_html=True
-            )
-            st.markdown('<div class="output">Not Spam</div>', unsafe_allow_html=True)
-    else:
-        st.write("No prediction available. Please enter a message on the Input page and click 'Predict'.")
+            st.markdown('<div class="output not-spam">Not Spam</div>', unsafe_allow_html=True)
 
-    # Feedback mechanism
-    st.write("Please provide your feedback:")
-    feedback = st.text_area("Was the prediction correct? Any suggestions?")
-    if st.button("Submit Feedback"):
-        st.session_state.history[-1] += (feedback,)
-        st.success("Thank you for your feedback!")
+        # Generate report using Google Generative AI API
+        st.write("Generating report...")
+
+        report = genai.GenerativeModel("gemini-pro").generate_content(
+            f"Generate a detailed report on why the following message was classified as {prediction_text}: {st.session_state.history[-1][0]}"
+        ).text
+
+        st.write("### Report")
+        st.write(report)
+
+        # Add feedback section
+        st.write("### Feedback")
+        feedback = st.text_input("Please provide your feedback on the prediction:")
+
+        if st.button("Submit Feedback"):
+            st.session_state.history[-1] = st.session_state.history[-1][:2] + (feedback,)
+            st.success("Thank you for your feedback!")
 
 # History page
 elif page == "History":
-    st.title("History")
+    st.markdown('<div class="title-banner">Spam Detective - History</div>', unsafe_allow_html=True)
     if st.session_state.history:
-        df = pd.DataFrame(st.session_state.history, columns=["Message", "Prediction", "Feedback"])
-        st.write(df)
-
-        csv = df.to_csv(index=False)
-        b64 = base64.b64encode(csv.encode()).decode()
-        href = f'<a href="data:file/csv;base64,{b64}" download="prediction_history.csv">Download CSV file</a>'
-        st.markdown(href, unsafe_allow_html=True)
+        st.write("Here is the history of your predictions:")
+        for i, (text, prediction, feedback) in enumerate(st.session_state.history, start=1):
+            st.write(f"**{i}. Message:** {text}")
+            st.write(f"**Prediction:** {prediction}")
+            st.write(f"**Feedback:** {feedback}")
+            st.write("---")
     else:
         st.write("No history available.")
 
-# Batch Processing page
-elif page == "Batch Processing":
-    st.title("Batch Processing")
-    uploaded_file = st.file_uploader("Choose a file")
-    if uploaded_file:
-        df = pd.read_csv(uploaded_file)
-        df['Transformed'] = df['Message'].apply(transform_text)
-        df['Prediction'] = model.predict(tfidf.transform(df['Transformed']))
-        df['Prediction'] = df['Prediction'].apply(lambda x: "Spam" if x == 1 else "Not Spam")
-        st.write(df)
-        csv = df.to_csv(index=False)
-        b64 = base64.b64encode(csv.encode()).decode()
-        href = f'<a href="data:file/csv;base64,{b64}" download="batch_predictions.csv">Download CSV file</a>'
-        st.markdown(href, unsafe_allow_html=True)
+# Graph page
+elif page == "Graph":
+    st.markdown('<div class="title-banner">Spam Detective - Graph</div>', unsafe_allow_html=True)
+    st.write("### Spam vs Non-Spam Distribution")
+    
+    spam_count = sum(1 for _, pred, _ in st.session_state.history if pred == "Spam")
+    not_spam_count = sum(1 for _, pred, _ in st.session_state.history if pred == "Not Spam")
 
-# Admin page
-elif page == "Admin":
-    st.title("Admin Dashboard")
-    st.write("Here admin users can manage data, retrain models, and more.")
-    # Add functionality for uploading new datasets and retraining the model here.
+    labels = 'Spam', 'Not Spam'
+    sizes = [spam_count, not_spam_count]
+    colors = ['#ff6666', '#66b3ff']
+    explode = (0.1, 0)  # explode the 1st slice (Spam)
+
+    fig1, ax1 = plt.subplots()
+    ax1.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%',
+            shadow=True, startangle=90)
+    ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+
+    st.pyplot(fig1)
+
+# Footer
+st.markdown(
+    """
+    <div class="footer">
+        A project to classify email as spam or not spam.
+    </div>
+    """,
+    unsafe_allow_html=True
+)

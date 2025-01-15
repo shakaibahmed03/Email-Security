@@ -20,7 +20,7 @@ with open('model1.pkl', 'rb') as file:
 with open('vectorizer1.pkl', 'rb') as file:
     tfidf = pickle.load(file)
 
-genai.configure(api_key="AIzaSyDT2XA6oN1XAxYbaSBrE9sD3FQj5ylmrdo")
+genai.configure(api_key="#enter your api key here")
 
 # Define text preprocessing function
 ps = PorterStemmer()
